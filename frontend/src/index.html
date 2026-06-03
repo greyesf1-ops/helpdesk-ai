@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HelpDesk AI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">H</span>
+          <div>
+            <h1>HelpDesk AI</h1>
+            <p>Soporte tecnico</p>
+          </div>
+        </div>
+        <button id="newConversation" class="primary-button">+ Nueva consulta</button>
+        <div class="section-title">Historial</div>
+        <div id="conversationList" class="conversation-list"></div>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">Mesa de ayuda</p>
+            <h2 id="conversationTitle">Consulta de soporte</h2>
+          </div>
+          <div id="statusBadge" class="status-badge">Conectando</div>
+        </header>
+
+        <div id="messages" class="messages"></div>
+
+        <form id="messageForm" class="composer">
+          <textarea
+            id="messageInput"
+            rows="3"
+            placeholder="Describe el problema tecnico..."
+            required
+          ></textarea>
+          <button type="submit">Enviar</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+
