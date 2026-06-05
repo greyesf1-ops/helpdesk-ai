@@ -4,8 +4,8 @@ variable "do_token" {
   sensitive   = true
 }
 
-variable "ssh_key_fingerprint" {
-  description = "Fingerprint o ID de la llave SSH registrada en DigitalOcean."
+variable "ssh_public_key" {
+  description = "Llave publica SSH que Terraform registrara en DigitalOcean."
   type        = string
 }
 
@@ -32,4 +32,3 @@ variable "ssh_allowed_ips" {
   type        = list(string)
   default     = ["0.0.0.0/0", "::/0"]
 }
-

@@ -1,7 +1,6 @@
 do_token            = "dop_v1_coloca_tu_token"
-ssh_key_fingerprint = "coloca_fingerprint_o_id_de_tu_llave"
+ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHwG4/+IvsOCCXPiWZEKSSDciI1LaMZNnjr/XYHZGTZ8 your_email@example.com"
 droplet_name        = "helpdesk-ai-vps"
 region              = "nyc3"
 droplet_size        = "s-1vcpu-1gb"
 ssh_allowed_ips     = ["0.0.0.0/0", "::/0"]
-

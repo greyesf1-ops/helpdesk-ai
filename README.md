@@ -138,7 +138,7 @@ terraform apply
 Variables principales:
 
 - `do_token`
-- `ssh_key_fingerprint`
+- `ssh_public_key`
 - `region`
 - `droplet_size`
 - `droplet_name`

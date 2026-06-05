@@ -13,12 +13,17 @@ provider "digitalocean" {
   token = var.do_token
 }
 
+resource "digitalocean_ssh_key" "default" {
+  name       = "${var.droplet_name}-ssh-key"
+  public_key = var.ssh_public_key
+}
+
 resource "digitalocean_droplet" "app" {
   image    = "ubuntu-24-04-x64"
   name     = var.droplet_name
   region   = var.region
   size     = var.droplet_size
-  ssh_keys = [var.ssh_key_fingerprint]
+  ssh_keys = [digitalocean_ssh_key.default.fingerprint]
 
   user_data = <<-EOF
     #cloud-config
@@ -75,4 +80,3 @@ resource "digitalocean_firewall" "app" {
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 }
-
