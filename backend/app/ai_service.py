@@ -8,9 +8,10 @@ from app.models import Message
 
 SYSTEM_PROMPT = (
     "Eres HelpDesk AI, un asistente de soporte tecnico para usuarios internos. "
-    "Responde en espanol claro, con pasos numerados cuando sea util. "
-    "Clasifica mentalmente el problema, pide datos faltantes si hacen falta y "
-    "recomienda escalar si hay riesgo de seguridad, perdida de datos o caida general."
+    "Actua como un agente real de mesa de ayuda: toma el caso, da seguimiento y no abras "
+    "tickets nuevos dentro de una misma conversacion. Responde en espanol claro, con pasos "
+    "numerados cuando sea util. Estima prioridad, pide datos faltantes y recomienda escalar "
+    "si hay riesgo de seguridad, perdida de datos, caida general o varios usuarios afectados."
 )
 
 
@@ -22,6 +23,7 @@ CATEGORY_KEYWORDS = {
     "rendimiento": ["lento", "lentitud", "congela", "trabado", "cpu", "memoria"],
     "backup": ["backup", "respaldo", "restaurar", "perdido", "borrado", "archivo"],
     "seguridad": ["virus", "phishing", "malware", "sospechoso", "hack", "seguridad"],
+    "software": ["programa", "aplicacion", "aplicación", "sistema", "app", "cierra", "crash", "abre"],
 }
 
 PRIORITY_KEYWORDS = {
@@ -101,6 +103,15 @@ CATEGORY_RUNBOOKS = {
         ],
         "question": "Puedes indicar si recibiste un correo, enlace, archivo o alerta del antivirus?",
     },
+    "software": {
+        "impact": "posible falla de aplicacion, instalacion, permisos o compatibilidad",
+        "steps": [
+            "Confirma el nombre exacto del programa y en que momento se cierra.",
+            "Revisa si ocurre solo con tu usuario o tambien con otro usuario/equipo.",
+            "Anota el mensaje de error y prueba abrir la aplicacion despues de reiniciar.",
+        ],
+        "question": "El programa muestra un error antes de cerrarse o simplemente desaparece?",
+    },
     "general": {
         "impact": "incidente general pendiente de clasificacion",
         "steps": [
@@ -121,6 +132,15 @@ def detect_category(text: str) -> str:
     return "general"
 
 
+def resolve_case_category(detected_category: str, history: list[Message]) -> str:
+    if detected_category != "general":
+        return detected_category
+    for message in reversed(history):
+        if message.category and message.category != "general":
+            return message.category
+    return detected_category
+
+
 def detect_priority(text: str, category: str) -> str:
     normalized = text.lower()
     if category == "seguridad" or any(keyword in normalized for keyword in PRIORITY_KEYWORDS["seguridad"]):
@@ -137,16 +157,48 @@ def stable_choice(text: str, options: list[str]) -> str:
     return options[int(digest[:4], 16) % len(options)]
 
 
-def build_ticket_id(text: str) -> str:
-    digest = sha1(text.encode("utf-8")).hexdigest().upper()
+PRIORITY_RANK = {"baja": 1, "media": 2, "alta": 3}
+
+
+def build_ticket_id(seed: str | int) -> str:
+    digest = sha1(str(seed).encode("utf-8")).hexdigest().upper()
     return f"HD-{digest[:6]}"
 
 
-def build_fallback_reply(user_message: str, category: str) -> str:
+def get_highest_priority(current_priority: str, history: list[Message]) -> str:
+    highest = current_priority
+    for message in history:
+        normalized = message.content.lower()
+        for priority in PRIORITY_RANK:
+            if f"prioridad inicial: {priority}" in normalized or f"prioridad actual: {priority}" in normalized:
+                if PRIORITY_RANK[priority] > PRIORITY_RANK[highest]:
+                    highest = priority
+    return highest
+
+
+def build_fallback_reply(
+    user_message: str,
+    category: str,
+    conversation_id: int,
+    history: list[Message],
+) -> str:
     runbook = CATEGORY_RUNBOOKS[category]
-    priority = detect_priority(user_message, category)
-    ticket_id = build_ticket_id(user_message)
+    detected_priority = detect_priority(user_message, category)
+    priority = get_highest_priority(detected_priority, history)
+    ticket_id = build_ticket_id(f"conversation-{conversation_id}")
     opener = stable_choice(user_message, AGENT_OPENERS)
+    has_prior_user_messages = sum(1 for message in history if message.role == "user") > 1
+    case_state = "seguimiento" if has_prior_user_messages else "nuevo"
+    case_line = (
+        "Lo agrego como seguimiento del mismo ticket; no abriria un caso nuevo."
+        if has_prior_user_messages
+        else "Abro el caso inicial para registrar diagnostico y evidencia."
+    )
+    escalation_line = (
+        f"Escalamiento: la prioridad sube de {detected_priority} a {priority} por el contexto previo del caso."
+        if PRIORITY_RANK[priority] > PRIORITY_RANK[detected_priority]
+        else "Escalamiento: por ahora se mantiene la prioridad detectada."
+    )
     escalation = {
         "alta": "Si afecta a varios usuarios o impide trabajar, lo escalaria como prioridad alta.",
         "media": "Si despues de estas pruebas continua, lo dejaria como prioridad media para seguimiento.",
@@ -162,13 +214,16 @@ def build_fallback_reply(user_message: str, category: str) -> str:
     return "\n".join(
         [
             opener,
-            f"Ticket sugerido: {ticket_id}",
+            f"Ticket: {ticket_id}",
+            f"Estado del caso: {case_state}",
+            case_line,
             f"Categoria detectada: {category}",
-            f"Prioridad inicial: {priority}",
+            f"Prioridad actual: {priority}",
             f"Impacto probable: {runbook['impact']}.",
             steps,
             f"Pregunta para continuar: {runbook['question']}",
             evidence,
+            escalation_line,
             escalation,
         ]
     )
@@ -186,19 +241,31 @@ def get_recent_messages(db: Session, conversation_id: int, limit: int = 8) -> li
 
 
 def generate_ai_reply(db: Session, conversation_id: int, user_message: str) -> tuple[str, str]:
-    category = detect_category(user_message)
+    detected_category = detect_category(user_message)
     api_key = os.getenv("OPENAI_API_KEY")
+    history = get_recent_messages(db, conversation_id)
+    category = resolve_case_category(detected_category, history)
+    ticket_id = build_ticket_id(f"conversation-{conversation_id}")
+    priority = get_highest_priority(detect_priority(user_message, category), history)
+    has_prior_user_messages = sum(1 for message in history if message.role == "user") > 1
 
     if not api_key:
-        return build_fallback_reply(user_message, category), category
+        return build_fallback_reply(user_message, category, conversation_id, history), category
 
     try:
         from openai import OpenAI
 
         client = OpenAI(api_key=api_key)
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        history = get_recent_messages(db, conversation_id)
-        input_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        case_context = (
+            f"Contexto del caso: ticket {ticket_id}. "
+            f"Categoria detectada por el sistema: {category}. "
+            f"Prioridad estimada por el sistema: {priority}. "
+            f"Estado: {'seguimiento de caso existente' if has_prior_user_messages else 'caso nuevo'}. "
+            "Si ya existe historial, responde como seguimiento del mismo ticket y escala solo si el impacto aumento. "
+            "No digas que eres un modelo; habla como agente de soporte tecnico."
+        )
+        input_messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{case_context}"}]
         input_messages.extend({"role": item.role, "content": item.content} for item in history)
         if not history or history[-1].role != "user" or history[-1].content != user_message:
             input_messages.append({"role": "user", "content": user_message})
@@ -210,4 +277,4 @@ def generate_ai_reply(db: Session, conversation_id: int, user_message: str) -> t
     except Exception:
         pass
 
-    return build_fallback_reply(user_message, category), category
+    return build_fallback_reply(user_message, category, conversation_id, history), category

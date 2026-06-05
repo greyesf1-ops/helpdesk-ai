@@ -100,12 +100,15 @@ def persist_chat_message(
             f"{normalized_content}\n\nEl usuario adjunto una imagen o captura como evidencia tecnica."
         )
 
-    assistant_text, _assistant_category = generate_ai_reply(db, conversation_id, prompt_content)
+    assistant_text, assistant_category = generate_ai_reply(db, conversation_id, prompt_content)
+    if user_message.category != assistant_category:
+        user_message.category = assistant_category
+        db.add(user_message)
     assistant_message = Message(
         conversation_id=conversation_id,
         role="assistant",
         content=assistant_text,
-        category=category,
+        category=assistant_category,
     )
     db.add(assistant_message)
     db.commit()
