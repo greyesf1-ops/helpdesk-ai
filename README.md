@@ -153,12 +153,25 @@ Outputs utiles:
 
 1. Crear la VPS con Terraform.
 2. Entrar por SSH.
-3. Instalar Docker si no se uso el `user_data` incluido.
-4. Clonar el repositorio en `/opt/helpdesk-ai`.
-5. Crear `.env`.
-6. Ejecutar:
+3. Instalar Docker si no se uso el `user_data` incluido:
 
 ```bash
+sudo ./scripts/server-bootstrap-ubuntu.sh
+```
+
+4. Clonar el repositorio en `/opt/helpdesk-ai`, crear `.env` y levantar contenedores:
+
+```bash
+sudo APP_DIR=/opt/helpdesk-ai REPO_URL=https://github.com/greyesf1-ops/helpdesk-ai.git ./scripts/deploy-vps.sh
+```
+
+Tambien se puede hacer manualmente:
+
+```bash
+cd /opt
+git clone https://github.com/greyesf1-ops/helpdesk-ai.git
+cd helpdesk-ai
+cp .env.example .env
 docker compose up -d --build
 ```
 
@@ -171,4 +184,3 @@ docker compose logs -f frontend
 docker compose logs -f db
 docker compose restart backend
 ```
-
