@@ -9,9 +9,12 @@ from app.models import Message
 SYSTEM_PROMPT = (
     "Eres HelpDesk AI, un asistente de soporte tecnico para usuarios internos. "
     "Actua como un agente real de mesa de ayuda: toma el caso, da seguimiento y no abras "
-    "tickets nuevos dentro de una misma conversacion. Responde en espanol claro, con pasos "
-    "numerados cuando sea util. Estima prioridad, pide datos faltantes y recomienda escalar "
-    "si hay riesgo de seguridad, perdida de datos, caida general o varios usuarios afectados."
+    "tickets nuevos dentro de una misma conversacion. Cada conversacion nueva representa un "
+    "ticket nuevo; cada mensaje posterior en esa conversacion es seguimiento del mismo ticket. "
+    "Responde en espanol claro, con pasos numerados cuando sea util. Estima prioridad, pide "
+    "datos faltantes y recomienda escalar solo si la informacion indica criticidad real: riesgo "
+    "de seguridad, perdida de datos, caida general, varios usuarios afectados, proceso critico "
+    "detenido o fecha limite operativa afectada."
 )
 
 
@@ -27,7 +30,26 @@ CATEGORY_KEYWORDS = {
 }
 
 PRIORITY_KEYWORDS = {
-    "alta": ["urgente", "produccion", "caido", "caida", "no funciona", "bloqueado", "todos", "empresa"],
+    "alta": [
+        "urgente",
+        "produccion",
+        "producción",
+        "caido",
+        "caida",
+        "caída",
+        "bloqueado",
+        "todos",
+        "empresa",
+        "critico",
+        "crítico",
+        "cierre contable",
+        "facturacion",
+        "facturación",
+        "nomina",
+        "nómina",
+        "perdida de datos",
+        "pérdida de datos",
+    ],
     "media": ["no puedo", "error", "falla", "problema", "lento", "intermitente"],
     "seguridad": ["virus", "phishing", "malware", "hack", "sospechoso", "ransomware"],
 }
@@ -176,6 +198,36 @@ def get_highest_priority(current_priority: str, history: list[Message]) -> str:
     return highest
 
 
+def should_escalate(user_message: str, priority: str, history: list[Message]) -> bool:
+    normalized = user_message.lower()
+    critical_signals = [
+        "seguridad",
+        "virus",
+        "phishing",
+        "malware",
+        "perdida de datos",
+        "pérdida de datos",
+        "todos",
+        "varios usuarios",
+        "empresa",
+        "produccion",
+        "producción",
+        "cierre contable",
+        "facturacion",
+        "facturación",
+        "nomina",
+        "nómina",
+        "no puedo trabajar",
+        "caido",
+        "caído",
+        "caida",
+        "caída",
+    ]
+    if priority == "alta" and any(signal in normalized for signal in critical_signals):
+        return True
+    return any("prioridad actual: alta" in message.content.lower() for message in history if message.role == "assistant")
+
+
 def build_fallback_reply(
     user_message: str,
     category: str,
@@ -185,6 +237,7 @@ def build_fallback_reply(
     runbook = CATEGORY_RUNBOOKS[category]
     detected_priority = detect_priority(user_message, category)
     priority = get_highest_priority(detected_priority, history)
+    escalates = should_escalate(user_message, priority, history)
     ticket_id = build_ticket_id(f"conversation-{conversation_id}")
     opener = stable_choice(user_message, AGENT_OPENERS)
     has_prior_user_messages = sum(1 for message in history if message.role == "user") > 1
@@ -195,15 +248,15 @@ def build_fallback_reply(
         else "Abro el caso inicial para registrar diagnostico y evidencia."
     )
     escalation_line = (
-        f"Escalamiento: la prioridad sube de {detected_priority} a {priority} por el contexto previo del caso."
-        if PRIORITY_RANK[priority] > PRIORITY_RANK[detected_priority]
-        else "Escalamiento: por ahora se mantiene la prioridad detectada."
+        "Escalamiento: si. La informacion indica impacto critico y el area de soporte debe tomar el caso con prioridad."
+        if escalates
+        else "Escalamiento: no por ahora. Se mantiene en seguimiento hasta confirmar impacto critico."
     )
-    escalation = {
-        "alta": "Si afecta a varios usuarios o impide trabajar, lo escalaria como prioridad alta.",
-        "media": "Si despues de estas pruebas continua, lo dejaria como prioridad media para seguimiento.",
-        "baja": "Por ahora lo dejaria como prioridad baja, salvo que el impacto aumente.",
-    }[priority]
+    escalation = (
+        "Motivo: posible afectacion critica para operacion, seguridad, datos o varios usuarios."
+        if escalates
+        else "Motivo: aun no hay suficiente evidencia de criticidad; se solicitan datos adicionales antes de escalar."
+    )
     evidence = (
         "Como adjuntaste evidencia, la mantendria asociada al caso para que soporte no tenga que pedirla otra vez."
         if "adjunto" in user_message.lower() or "captura" in user_message.lower()
@@ -219,6 +272,7 @@ def build_fallback_reply(
             case_line,
             f"Categoria detectada: {category}",
             f"Prioridad actual: {priority}",
+            f"Requiere escalamiento: {'si' if escalates else 'no'}",
             f"Impacto probable: {runbook['impact']}.",
             steps,
             f"Pregunta para continuar: {runbook['question']}",
@@ -263,6 +317,10 @@ def generate_ai_reply(db: Session, conversation_id: int, user_message: str) -> t
             f"Prioridad estimada por el sistema: {priority}. "
             f"Estado: {'seguimiento de caso existente' if has_prior_user_messages else 'caso nuevo'}. "
             "Si ya existe historial, responde como seguimiento del mismo ticket y escala solo si el impacto aumento. "
+            "Regla de escalamiento: no escales por cualquier seguimiento; escala solamente si el usuario aporta "
+            "informacion critica como seguridad, perdida de datos, varios usuarios afectados, servicio caido, "
+            "proceso critico detenido, cierre contable, facturacion, nomina o imposibilidad real de trabajar. "
+            "Si no hay criticidad, manten el ticket en seguimiento y pide la informacion faltante. "
             "No digas que eres un modelo; habla como agente de soporte tecnico."
         )
         input_messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{case_context}"}]
