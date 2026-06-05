@@ -2,12 +2,14 @@ const state = {
   conversations: [],
   currentConversationId: null,
   isSending: false,
+  searchTerm: "",
 };
 
 const elements = {
   conversationList: document.querySelector("#conversationList"),
   newConversation: document.querySelector("#newConversation"),
   conversationTitle: document.querySelector("#conversationTitle"),
+  conversationSearch: document.querySelector("#conversationSearch"),
   statusBadge: document.querySelector("#statusBadge"),
   messages: document.querySelector("#messages"),
   messageForm: document.querySelector("#messageForm"),
@@ -36,41 +38,84 @@ async function api(path, options = {}) {
 
 function formatDate(value) {
   return new Intl.DateTimeFormat("es-GT", {
-    dateStyle: "short",
-    timeStyle: "short",
+    day: "numeric",
+    month: "numeric",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
 function setStatus(text, ok = true) {
-  elements.statusBadge.textContent = text;
-  elements.statusBadge.style.background = ok ? "#dff6f1" : "#ffe8d6";
-  elements.statusBadge.style.color = ok ? "#12695e" : "#9b4d12";
+  elements.statusBadge.textContent = ok ? "En linea" : text;
+  elements.statusBadge.classList.toggle("offline", !ok);
+}
+
+function getConversationTone(title) {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("correo") || normalized.includes("mail")) return "mail";
+  if (normalized.includes("red") || normalized.includes("internet") || normalized.includes("wifi")) return "network";
+  if (normalized.includes("acceso") || normalized.includes("password")) return "warning";
+  if (normalized.includes("adjunto") || normalized.includes("captura")) return "file";
+  return "chat";
+}
+
+function getConversationIcon(tone) {
+  const icons = {
+    mail: "M",
+    network: "W",
+    warning: "!",
+    file: "I",
+    chat: "C",
+  };
+  return icons[tone] || "C";
 }
 
 function renderConversations() {
   elements.conversationList.innerHTML = "";
+  const filtered = state.conversations.filter((conversation) =>
+    conversation.title.toLowerCase().includes(state.searchTerm.toLowerCase()),
+  );
 
-  if (!state.conversations.length) {
+  if (!filtered.length) {
     const empty = document.createElement("div");
-    empty.className = "conversation-item";
-    empty.innerHTML = "<strong>Sin historial</strong><span>Crea una consulta</span>";
+    empty.className = "conversation-empty";
+    empty.textContent = state.searchTerm ? "Sin resultados" : "Crea una consulta";
     elements.conversationList.appendChild(empty);
     return;
   }
 
-  state.conversations.forEach((conversation) => {
+  filtered.forEach((conversation) => {
+    const tone = getConversationTone(conversation.title);
     const button = document.createElement("button");
-    button.className = "conversation-item";
+    button.className = `conversation-item tone-${tone}`;
     if (conversation.id === state.currentConversationId) {
       button.classList.add("active");
     }
     button.innerHTML = `
-      <strong>${escapeHtml(conversation.title)}</strong>
-      <span>${formatDate(conversation.updated_at)}</span>
+      <span class="conversation-icon">${getConversationIcon(tone)}</span>
+      <span class="conversation-copy">
+        <strong>${escapeHtml(conversation.title)}</strong>
+        <span>${formatDate(conversation.updated_at)}</span>
+      </span>
     `;
     button.addEventListener("click", () => selectConversation(conversation.id));
     elements.conversationList.appendChild(button);
   });
+}
+
+function formatAssistantContent(content) {
+  return content
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => {
+      const match = line.match(/^(\d+)\.\s+(.*)$/);
+      if (match) {
+        return `<span class="step-line"><span>${match[1]}</span>${escapeHtml(match[2])}</span>`;
+      }
+      return `<span class="text-line">${escapeHtml(line)}</span>`;
+    })
+    .join("");
 }
 
 function renderMessages(messages) {
@@ -79,28 +124,47 @@ function renderMessages(messages) {
   if (!messages.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Describe un problema tecnico para iniciar el diagnostico.";
+    empty.innerHTML = `
+      <strong>Listo para atender soporte tecnico</strong>
+      <span>Describe un problema o adjunta una captura para iniciar el diagnostico.</span>
+    `;
     elements.messages.appendChild(empty);
     return;
   }
 
   messages.forEach((message) => {
-    const article = document.createElement("article");
-    article.className = `message ${message.role}`;
+    const row = document.createElement("div");
+    row.className = `message-row ${message.role}`;
     const attachment = message.attachment_url
       ? `<a class="message-attachment" href="${message.attachment_url}" target="_blank" rel="noreferrer">
           <img src="${message.attachment_url}" alt="Captura adjunta del caso" />
         </a>`
       : "";
-    article.innerHTML = `
-      <div class="message-meta">
-        <span>${message.role === "user" ? "Usuario" : "HelpDesk AI"}</span>
-        ${message.category ? `<span class="category">${escapeHtml(message.category)}</span>` : ""}
-      </div>
-      <p>${escapeHtml(message.content)}</p>
-      ${attachment}
+    const content =
+      message.role === "assistant"
+        ? formatAssistantContent(message.content)
+        : `<span class="text-line">${escapeHtml(message.content)}</span>`;
+
+    row.innerHTML = `
+      ${message.role === "assistant" ? '<span class="bot-avatar" aria-hidden="true"></span>' : ""}
+      <article class="message ${message.role}">
+        ${
+          message.role === "assistant"
+            ? `<div class="message-meta"><strong>HelpDesk AI</strong>${
+                message.category ? `<span class="category">${escapeHtml(message.category)}</span>` : ""
+              }</div>`
+            : ""
+        }
+        <div class="message-content">${content}</div>
+        ${attachment}
+        <div class="message-footer">
+          <span>${formatDate(message.created_at)}</span>
+          ${message.role === "assistant" ? "<span>Me gusta</span><span>Revisar</span>" : "<span>OK</span>"}
+        </div>
+      </article>
+      ${message.role === "user" ? '<span class="user-avatar" aria-hidden="true">U</span>' : ""}
     `;
-    elements.messages.appendChild(article);
+    elements.messages.appendChild(row);
   });
 
   elements.messages.scrollTop = elements.messages.scrollHeight;
@@ -232,4 +296,8 @@ elements.newConversation.addEventListener("click", createConversation);
 elements.messageForm.addEventListener("submit", sendMessage);
 elements.attachmentButton.addEventListener("click", () => elements.attachmentInput.click());
 elements.attachmentInput.addEventListener("change", renderAttachmentPreview);
+elements.conversationSearch.addEventListener("input", (event) => {
+  state.searchTerm = event.target.value;
+  renderConversations();
+});
 boot();

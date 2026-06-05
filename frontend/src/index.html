@@ -10,44 +10,51 @@
     <main class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark">H</span>
+          <span class="brand-mark" aria-hidden="true"></span>
           <div>
             <h1>HelpDesk AI</h1>
-            <p>Soporte tecnico</p>
           </div>
         </div>
         <button id="newConversation" class="primary-button">+ Nueva consulta</button>
         <div class="section-title">Historial</div>
         <div id="conversationList" class="conversation-list"></div>
+        <div class="agent-card">
+          <div class="agent-avatar">CM</div>
+          <div>
+            <strong>Carlos Mendez</strong>
+            <span>Soporte Tecnico</span>
+          </div>
+          <button type="button" aria-label="Abrir opciones">v</button>
+        </div>
       </aside>
 
       <section class="chat-panel">
         <header class="chat-header">
-          <div>
-            <p class="eyebrow">Mesa de ayuda</p>
-            <h2 id="conversationTitle">Consulta de soporte</h2>
+          <div class="search-shell">
+            <span aria-hidden="true"></span>
+            <input id="conversationSearch" type="search" placeholder="Buscar en conversaciones..." />
           </div>
-          <div id="statusBadge" class="status-badge">Conectando</div>
+          <div class="top-actions">
+            <div id="statusBadge" class="status-badge">Conectando</div>
+            <button type="button" class="icon-button" aria-label="Notificaciones">3</button>
+            <button type="button" class="icon-button" aria-label="Ayuda">?</button>
+            <div class="profile-chip">CM</div>
+          </div>
         </header>
 
+        <h2 id="conversationTitle" class="sr-only">Consulta de soporte</h2>
         <div id="messages" class="messages"></div>
 
         <form id="messageForm" class="composer">
+          <input id="attachmentInput" type="file" accept="image/*" hidden />
+          <button id="attachmentButton" class="attach-button" type="button" aria-label="Adjuntar captura">A</button>
           <div class="composer-body">
-            <textarea
-              id="messageInput"
-              rows="3"
-              placeholder="Describe el problema tecnico..."
-              required
-            ></textarea>
+            <textarea id="messageInput" rows="1" placeholder="Escribe tu consulta aqui..." required></textarea>
             <div id="attachmentPreview" class="attachment-preview hidden"></div>
           </div>
-          <div class="composer-actions">
-            <input id="attachmentInput" type="file" accept="image/*" hidden />
-            <button id="attachmentButton" class="secondary-button" type="button">Adjuntar captura</button>
-            <button type="submit">Enviar</button>
-          </div>
+          <button class="send-button" type="submit" aria-label="Enviar">></button>
         </form>
+        <p class="disclaimer">HelpDesk AI puede cometer errores. Verifica la informacion.</p>
       </section>
     </main>
 

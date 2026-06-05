@@ -1,4 +1,5 @@
 import os
+from hashlib import sha1
 
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,94 @@ CATEGORY_KEYWORDS = {
     "seguridad": ["virus", "phishing", "malware", "sospechoso", "hack", "seguridad"],
 }
 
+PRIORITY_KEYWORDS = {
+    "alta": ["urgente", "produccion", "caido", "caida", "no funciona", "bloqueado", "todos", "empresa"],
+    "media": ["no puedo", "error", "falla", "problema", "lento", "intermitente"],
+    "seguridad": ["virus", "phishing", "malware", "hack", "sospechoso", "ransomware"],
+}
+
+AGENT_OPENERS = [
+    "Gracias por reportarlo. Ya estoy tomando el caso y voy a guiarte con el diagnostico inicial.",
+    "Recibido. Lo voy a manejar como incidente de mesa de ayuda y te dejo los pasos de validacion.",
+    "Entiendo el caso. Primero voy a separar impacto, evidencia y acciones inmediatas para avanzar ordenadamente.",
+    "De acuerdo. Con la informacion que compartiste, voy a abrir el analisis tecnico inicial.",
+]
+
+CATEGORY_RUNBOOKS = {
+    "credenciales": {
+        "impact": "posible bloqueo de cuenta o problema de autenticacion",
+        "steps": [
+            "Confirma si el usuario puede entrar a otros sistemas con la misma cuenta.",
+            "Valida si hubo cambio reciente de contrasena o intentos fallidos.",
+            "Prueba restablecimiento de contrasena solo si el usuario confirma identidad.",
+        ],
+        "question": "Puedes confirmar si el error dice contrasena incorrecta, cuenta bloqueada o usuario no encontrado?",
+    },
+    "red": {
+        "impact": "posible falla de conectividad local, WiFi, cable o VPN",
+        "steps": [
+            "Prueba abrir una pagina externa y una pagina interna de la empresa.",
+            "Confirma si el equipo esta por WiFi, cable o VPN.",
+            "Ejecuta una prueba rapida reiniciando adaptador/red o cambiando de red si es posible.",
+        ],
+        "question": "El problema afecta solo a tu equipo o tambien a otros usuarios cercanos?",
+    },
+    "correo": {
+        "impact": "posible incidencia de acceso, envio, recepcion o espacio de buzon",
+        "steps": [
+            "Verifica si el correo abre desde navegador y desde la aplicacion instalada.",
+            "Revisa si puedes enviar un mensaje de prueba a un usuario interno.",
+            "Confirma si aparece error de credenciales, conexion o buzon lleno.",
+        ],
+        "question": "El problema es al iniciar sesion, enviar correos, recibir correos o abrir adjuntos?",
+    },
+    "impresion": {
+        "impact": "posible falla de cola de impresion, consumibles o conexion de impresora",
+        "steps": [
+            "Revisa si la impresora aparece en linea y sin trabajos atascados.",
+            "Confirma papel, toner y mensajes en pantalla de la impresora.",
+            "Prueba imprimir una pagina de prueba desde otro equipo si esta disponible.",
+        ],
+        "question": "La impresora muestra algun codigo de error o solo no imprime?",
+    },
+    "rendimiento": {
+        "impact": "posible saturacion de recursos o problema de aplicacion/equipo",
+        "steps": [
+            "Cierra aplicaciones no necesarias y verifica si mejora.",
+            "Revisa espacio disponible en disco y consumo de CPU/memoria.",
+            "Anota si la lentitud ocurre al iniciar sesion, abrir una app o durante todo el dia.",
+        ],
+        "question": "La lentitud ocurre en todo el equipo o solo en una aplicacion especifica?",
+    },
+    "backup": {
+        "impact": "posible perdida de informacion o necesidad de restauracion",
+        "steps": [
+            "Evita modificar la carpeta o archivo afectado para no sobrescribir evidencia.",
+            "Confirma nombre, ruta y fecha aproximada del archivo perdido.",
+            "Solicita restauracion desde el ultimo backup disponible.",
+        ],
+        "question": "Que archivo o carpeta necesitas restaurar y desde que fecha aproximada?",
+    },
+    "seguridad": {
+        "impact": "posible incidente de seguridad que requiere contencion",
+        "steps": [
+            "No abras enlaces ni archivos sospechosos adicionales.",
+            "Desconecta el equipo de la red si sospechas infeccion activa.",
+            "Escala el caso a seguridad TI con captura, remitente y hora del evento.",
+        ],
+        "question": "Puedes indicar si recibiste un correo, enlace, archivo o alerta del antivirus?",
+    },
+    "general": {
+        "impact": "incidente general pendiente de clasificacion",
+        "steps": [
+            "Describe el sistema afectado y el mensaje exacto de error.",
+            "Confirma desde cuando ocurre y si ya probaste reiniciar.",
+            "Adjunta captura si el sistema muestra una alerta o codigo.",
+        ],
+        "question": "Que sistema o aplicacion esta fallando y que mensaje exacto aparece?",
+    },
+}
+
 
 def detect_category(text: str) -> str:
     normalized = text.lower()
@@ -32,29 +121,57 @@ def detect_category(text: str) -> str:
     return "general"
 
 
+def detect_priority(text: str, category: str) -> str:
+    normalized = text.lower()
+    if category == "seguridad" or any(keyword in normalized for keyword in PRIORITY_KEYWORDS["seguridad"]):
+        return "alta"
+    if any(keyword in normalized for keyword in PRIORITY_KEYWORDS["alta"]):
+        return "alta"
+    if any(keyword in normalized for keyword in PRIORITY_KEYWORDS["media"]):
+        return "media"
+    return "baja"
+
+
+def stable_choice(text: str, options: list[str]) -> str:
+    digest = sha1(text.encode("utf-8")).hexdigest()
+    return options[int(digest[:4], 16) % len(options)]
+
+
+def build_ticket_id(text: str) -> str:
+    digest = sha1(text.encode("utf-8")).hexdigest().upper()
+    return f"HD-{digest[:6]}"
+
+
 def build_fallback_reply(user_message: str, category: str) -> str:
-    intro = "Entendido. Voy a tratarlo como un caso de soporte tecnico"
-    category_text = f" de categoria {category}" if category != "general" else ""
-    common_steps = [
-        "1. Confirma desde cuando ocurre el problema y si afecta solo a un usuario o a varios.",
-        "2. Reinicia la aplicacion o equipo involucrado y vuelve a probar.",
-        "3. Toma captura del error o anota el mensaje exacto si aparece alguno.",
-    ]
-    category_steps = {
-        "credenciales": "4. Si es acceso, valida usuario, bloqueo de cuenta y ultimo cambio de contrasena.",
-        "red": "4. Si es red, prueba otra pagina, verifica WiFi/cable y confirma si la VPN esta conectada.",
-        "correo": "4. Si es correo, revisa conexion, espacio del buzon y prueba enviar un mensaje interno.",
-        "impresion": "4. Si es impresion, revisa cola de impresion, papel, toner y conexion de la impresora.",
-        "rendimiento": "4. Si es lentitud, revisa programas abiertos, espacio en disco y consumo de CPU/memoria.",
-        "backup": "4. Si hubo perdida de archivos, evita sobrescribir datos y solicita restauracion desde backup.",
-        "seguridad": "4. Si sospechas de seguridad, desconecta el equipo de la red y escala el incidente de inmediato.",
-        "general": "4. Documenta el caso con prioridad, impacto y pasos ya probados.",
-    }
-    close = (
-        "Si el problema continua despues de estos pasos, registra el ticket con prioridad, "
-        "impacto, usuario afectado, equipo y evidencia."
+    runbook = CATEGORY_RUNBOOKS[category]
+    priority = detect_priority(user_message, category)
+    ticket_id = build_ticket_id(user_message)
+    opener = stable_choice(user_message, AGENT_OPENERS)
+    escalation = {
+        "alta": "Si afecta a varios usuarios o impide trabajar, lo escalaria como prioridad alta.",
+        "media": "Si despues de estas pruebas continua, lo dejaria como prioridad media para seguimiento.",
+        "baja": "Por ahora lo dejaria como prioridad baja, salvo que el impacto aumente.",
+    }[priority]
+    evidence = (
+        "Como adjuntaste evidencia, la mantendria asociada al caso para que soporte no tenga que pedirla otra vez."
+        if "adjunto" in user_message.lower() or "captura" in user_message.lower()
+        else "Si puedes, adjunta una captura del mensaje de error para acelerar el diagnostico."
     )
-    return "\n".join([f"{intro}{category_text}.", *common_steps, category_steps[category], close])
+
+    steps = "\n".join(f"{index}. {step}" for index, step in enumerate(runbook["steps"], start=1))
+    return "\n".join(
+        [
+            opener,
+            f"Ticket sugerido: {ticket_id}",
+            f"Categoria detectada: {category}",
+            f"Prioridad inicial: {priority}",
+            f"Impacto probable: {runbook['impact']}.",
+            steps,
+            f"Pregunta para continuar: {runbook['question']}",
+            evidence,
+            escalation,
+        ]
+    )
 
 
 def get_recent_messages(db: Session, conversation_id: int, limit: int = 8) -> list[Message]:
