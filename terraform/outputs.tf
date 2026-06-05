@@ -1,15 +1,14 @@
 output "public_ip" {
-  description = "IP publica de la VPS."
-  value       = digitalocean_droplet.app.ipv4_address
+  description = "IP publica de la instancia EC2."
+  value       = aws_instance.app.public_ip
 }
 
 output "ssh_command" {
   description = "Comando SSH sugerido."
-  value       = "ssh root@${digitalocean_droplet.app.ipv4_address}"
+  value       = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.app.public_ip}"
 }
 
 output "app_url" {
   description = "URL de la aplicacion en el puerto usado por Docker Compose."
-  value       = "http://${digitalocean_droplet.app.ipv4_address}:8080"
+  value       = "http://${aws_instance.app.public_ip}:8080"
 }
-

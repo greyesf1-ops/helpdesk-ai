@@ -39,7 +39,7 @@ El usuario accede al frontend. El frontend consume endpoints `/api`. Nginx redir
 
 ## Arquitectura de infraestructura
 
-La infraestructura objetivo es una VPS Linux Ubuntu creada con Terraform. En la VPS se ejecuta Docker y Docker Compose. Los contenedores se comunican por una red interna de Compose y solo se publica el puerto web.
+La infraestructura objetivo es una VPS Linux Ubuntu creada con Terraform sobre AWS EC2. En la VPS se ejecuta Docker y Docker Compose. Los contenedores se comunican por una red interna de Compose y solo se publica el puerto web.
 
 ## Tecnologias utilizadas
 
@@ -54,7 +54,7 @@ La infraestructura objetivo es una VPS Linux Ubuntu creada con Terraform. En la 
 - Docker Compose
 - GitHub Actions
 - Terraform
-- DigitalOcean como proveedor de VPS
+- AWS EC2 como proveedor de VPS
 
 ## Flujo general del sistema
 
@@ -70,7 +70,7 @@ La infraestructura objetivo es una VPS Linux Ubuntu creada con Terraform. En la 
 
 ## Despliegue en VPS
 
-El despliegue se realiza en una VPS Ubuntu. Terraform crea la VPS, configura una llave SSH, abre puertos necesarios y ejecuta una configuracion inicial para instalar Docker. Luego el repositorio se clona en `/opt/helpdesk-ai`, se crea el archivo `.env` y se ejecuta `docker compose up -d --build`.
+El despliegue se realiza en una VPS Ubuntu sobre AWS EC2. Terraform crea la instancia EC2, registra una llave SSH, abre puertos necesarios mediante un security group y ejecuta una configuracion inicial para instalar Docker. Luego el repositorio se clona en `/opt/helpdesk-ai`, se crea el archivo `.env` y se ejecuta `docker compose up -d --build`.
 
 ## Uso de Docker y Docker Compose
 
@@ -97,9 +97,9 @@ El pipeline de despliegue usa SSH para conectarse a la VPS, actualizar el reposi
 
 Terraform define:
 
-- VPS principal.
-- Variables de region, tamano, nombre y llave SSH.
-- Firewall basico.
+- Instancia EC2 principal.
+- Variables de region, tipo de instancia, tamano de disco, nombre y llave SSH.
+- Security group basico.
 - Outputs con IP publica, comando SSH y URL de la aplicacion.
 - Configuracion inicial para instalar Docker.
 
@@ -148,4 +148,3 @@ En operacion real se recomienda copiar los backups a almacenamiento externo, por
 - Integrar almacenamiento de archivos adjuntos.
 - Agregar HTTPS con reverse proxy y certificados.
 - Usar busqueda semantica sobre una base de conocimiento.
-

@@ -2,81 +2,113 @@ terraform {
   required_version = ">= 1.6.0"
 
   required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.43"
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
 }
 
-provider "digitalocean" {
-  token = var.do_token
+provider "aws" {
+  region = var.aws_region
 }
 
-resource "digitalocean_ssh_key" "default" {
-  name       = "${var.droplet_name}-ssh-key"
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+resource "aws_key_pair" "app" {
+  key_name   = "${var.project_name}-key"
   public_key = var.ssh_public_key
 }
 
-resource "digitalocean_droplet" "app" {
-  image    = "ubuntu-24-04-x64"
-  name     = var.droplet_name
-  region   = var.region
-  size     = var.droplet_size
-  ssh_keys = [digitalocean_ssh_key.default.fingerprint]
+resource "aws_security_group" "app" {
+  name        = "${var.project_name}-sg"
+  description = "Security group para HelpDesk AI"
 
-  user_data = <<-EOF
-    #cloud-config
-    package_update: true
-    packages:
-      - ca-certificates
-      - curl
-      - git
-    runcmd:
-      - install -m 0755 -d /etc/apt/keyrings
-      - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-      - chmod a+r /etc/apt/keyrings/docker.asc
-      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
-      - apt-get update
-      - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-      - systemctl enable docker
-      - systemctl start docker
-      - mkdir -p /opt/helpdesk-ai
-  EOF
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.ssh_allowed_ips
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Aplicacion web Docker Compose"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Salida general"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "${var.project_name}-sg"
+    Project = var.project_name
+  }
 }
 
-resource "digitalocean_firewall" "app" {
-  name = "${var.droplet_name}-firewall"
+resource "aws_instance" "app" {
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  key_name                    = aws_key_pair.app.key_name
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
 
-  droplet_ids = [digitalocean_droplet.app.id]
-
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "22"
-    source_addresses = var.ssh_allowed_ips
+  root_block_device {
+    volume_size = var.volume_size
+    volume_type = "gp3"
   }
 
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "80"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
+  user_data = <<-EOF
+    #!/bin/bash
+    set -eux
+    apt-get update
+    apt-get install -y ca-certificates curl git ufw
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl enable docker
+    systemctl start docker
+    ufw allow OpenSSH
+    ufw allow 80/tcp
+    ufw allow 8080/tcp
+    ufw --force enable
+    mkdir -p /opt/helpdesk-ai
+  EOF
 
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "8080"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  outbound_rule {
-    protocol              = "tcp"
-    port_range            = "1-65535"
-    destination_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  outbound_rule {
-    protocol              = "udp"
-    port_range            = "1-65535"
-    destination_addresses = ["0.0.0.0/0", "::/0"]
+  tags = {
+    Name    = var.project_name
+    Project = var.project_name
   }
 }

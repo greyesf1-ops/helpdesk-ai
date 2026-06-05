@@ -1,6 +1,6 @@
-do_token            = "dop_v1_coloca_tu_token"
-ssh_public_key      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHwG4/+IvsOCCXPiWZEKSSDciI1LaMZNnjr/XYHZGTZ8 your_email@example.com"
-droplet_name        = "helpdesk-ai-vps"
-region              = "nyc3"
-droplet_size        = "s-1vcpu-1gb"
-ssh_allowed_ips     = ["0.0.0.0/0", "::/0"]
+aws_region      = "us-east-1"
+project_name    = "helpdesk-ai"
+instance_type   = "t3.micro"
+volume_size     = 20
+ssh_public_key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHwG4/+IvsOCCXPiWZEKSSDciI1LaMZNnjr/XYHZGTZ8 your_email@example.com"
+ssh_allowed_ips = ["0.0.0.0/0"]

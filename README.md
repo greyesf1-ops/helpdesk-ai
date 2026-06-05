@@ -126,10 +126,19 @@ Secretos requeridos para despliegue:
 
 ## Terraform
 
-La carpeta `terraform/` contiene una configuracion base para crear una VPS en DigitalOcean.
+La carpeta `terraform/` contiene una configuracion base para crear una VPS Linux usando AWS EC2.
+
+Antes de ejecutar Terraform se necesita configurar credenciales de AWS en la computadora:
+
+```bash
+aws configure
+```
+
+Tambien se puede usar un perfil existente mediante la variable de entorno `AWS_PROFILE`.
 
 ```bash
 cd terraform
+cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform plan
 terraform apply
@@ -137,11 +146,11 @@ terraform apply
 
 Variables principales:
 
-- `do_token`
+- `aws_region`
 - `ssh_public_key`
-- `region`
-- `droplet_size`
-- `droplet_name`
+- `instance_type`
+- `volume_size`
+- `project_name`
 
 Outputs utiles:
 
@@ -152,7 +161,7 @@ Outputs utiles:
 ## Despliegue manual en VPS
 
 1. Crear la VPS con Terraform.
-2. Entrar por SSH.
+2. Entrar por SSH usando el output `ssh_command`.
 3. Instalar Docker si no se uso el `user_data` incluido:
 
 ```bash
@@ -169,10 +178,10 @@ Tambien se puede hacer manualmente:
 
 ```bash
 cd /opt
-git clone https://github.com/greyesf1-ops/helpdesk-ai.git
+sudo git clone https://github.com/greyesf1-ops/helpdesk-ai.git
 cd helpdesk-ai
-cp .env.example .env
-docker compose up -d --build
+sudo cp .env.example .env
+sudo docker compose up -d --build
 ```
 
 ## Operacion basica
