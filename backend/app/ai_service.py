@@ -270,8 +270,8 @@ def generate_ai_reply(db: Session, conversation_id: int, user_message: str) -> t
         if not history or history[-1].role != "user" or history[-1].content != user_message:
             input_messages.append({"role": "user", "content": user_message})
 
-        response = client.responses.create(model=model, input=input_messages)
-        answer = response.output_text.strip()
+        response = client.chat.completions.create(model=model, messages=input_messages)
+        answer = (response.choices[0].message.content or "").strip()
         if answer:
             return answer, category
     except Exception:
