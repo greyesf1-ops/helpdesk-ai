@@ -26,6 +26,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     category: str | None
+    attachment_url: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -34,4 +35,3 @@ class MessageOut(BaseModel):
 class ChatResponse(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
-

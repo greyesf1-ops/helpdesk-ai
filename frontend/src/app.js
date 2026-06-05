@@ -12,6 +12,9 @@ const elements = {
   messages: document.querySelector("#messages"),
   messageForm: document.querySelector("#messageForm"),
   messageInput: document.querySelector("#messageInput"),
+  attachmentInput: document.querySelector("#attachmentInput"),
+  attachmentButton: document.querySelector("#attachmentButton"),
+  attachmentPreview: document.querySelector("#attachmentPreview"),
 };
 
 async function api(path, options = {}) {
@@ -84,12 +87,18 @@ function renderMessages(messages) {
   messages.forEach((message) => {
     const article = document.createElement("article");
     article.className = `message ${message.role}`;
+    const attachment = message.attachment_url
+      ? `<a class="message-attachment" href="${message.attachment_url}" target="_blank" rel="noreferrer">
+          <img src="${message.attachment_url}" alt="Captura adjunta del caso" />
+        </a>`
+      : "";
     article.innerHTML = `
       <div class="message-meta">
         <span>${message.role === "user" ? "Usuario" : "HelpDesk AI"}</span>
         ${message.category ? `<span class="category">${escapeHtml(message.category)}</span>` : ""}
       </div>
       <p>${escapeHtml(message.content)}</p>
+      ${attachment}
     `;
     elements.messages.appendChild(article);
   });
@@ -104,6 +113,25 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function renderAttachmentPreview() {
+  const file = elements.attachmentInput.files?.[0];
+  if (!file) {
+    elements.attachmentPreview.classList.add("hidden");
+    elements.attachmentPreview.innerHTML = "";
+    return;
+  }
+
+  elements.attachmentPreview.classList.remove("hidden");
+  elements.attachmentPreview.innerHTML = `
+    <span>${escapeHtml(file.name)}</span>
+    <button id="removeAttachment" type="button">Quitar</button>
+  `;
+  document.querySelector("#removeAttachment").addEventListener("click", () => {
+    elements.attachmentInput.value = "";
+    renderAttachmentPreview();
+  });
 }
 
 async function loadConversations() {
@@ -146,14 +174,33 @@ async function sendMessage(event) {
   }
 
   state.isSending = true;
+  const attachment = elements.attachmentInput.files?.[0] || null;
   elements.messageInput.value = "";
   setStatus("Procesando");
 
   try {
-    await api(`/api/conversations/${state.currentConversationId}/messages`, {
-      method: "POST",
-      body: JSON.stringify({ content }),
-    });
+    if (attachment) {
+      const formData = new FormData();
+      formData.append("content", content);
+      formData.append("attachment", attachment);
+      const response = await fetch(
+        `/api/conversations/${state.currentConversationId}/messages-with-attachment`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+    } else {
+      await api(`/api/conversations/${state.currentConversationId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+    }
+    elements.attachmentInput.value = "";
+    renderAttachmentPreview();
     await loadConversations();
     await selectConversation(state.currentConversationId);
     setStatus("Operativo");
@@ -183,5 +230,6 @@ async function boot() {
 
 elements.newConversation.addEventListener("click", createConversation);
 elements.messageForm.addEventListener("submit", sendMessage);
+elements.attachmentButton.addEventListener("click", () => elements.attachmentInput.click());
+elements.attachmentInput.addEventListener("change", renderAttachmentPreview);
 boot();
-

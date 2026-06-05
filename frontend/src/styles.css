@@ -79,13 +79,18 @@ textarea {
 }
 
 .primary-button,
-.composer button {
+.composer button,
+.secondary-button {
   border: 0;
   border-radius: 8px;
-  background: var(--primary);
-  color: white;
   cursor: pointer;
   font-weight: 700;
+}
+
+.primary-button,
+.composer button[type="submit"] {
+  background: var(--primary);
+  color: white;
 }
 
 .primary-button {
@@ -93,8 +98,19 @@ textarea {
 }
 
 .primary-button:hover,
-.composer button:hover {
+.composer button[type="submit"]:hover {
   background: var(--primary-dark);
+}
+
+.secondary-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--primary-dark);
+}
+
+.secondary-button:hover {
+  border-color: var(--primary);
+  background: #edf8fa;
 }
 
 .section-title {
@@ -252,13 +268,32 @@ textarea {
   white-space: pre-wrap;
 }
 
+.message-attachment {
+  display: block;
+  margin-top: 12px;
+}
+
+.message-attachment img {
+  display: block;
+  width: min(100%, 360px);
+  max-height: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 .composer {
   display: grid;
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: 1fr 170px;
   gap: 12px;
   padding: 18px 30px 24px;
   border-top: 1px solid var(--border);
   background: var(--surface);
+}
+
+.composer-body {
+  display: grid;
+  gap: 8px;
 }
 
 .composer textarea {
@@ -279,6 +314,43 @@ textarea {
 .composer button {
   min-height: 48px;
   padding: 0 18px;
+}
+
+.composer-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.attachment-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-preview button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.hidden {
+  display: none;
 }
 
 @media (max-width: 820px) {
@@ -307,4 +379,3 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
-

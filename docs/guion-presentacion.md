@@ -11,7 +11,7 @@ Integrantes:
 
 ## Idea central
 
-HelpDesk AI es una aplicacion web de IA para apoyar una mesa de ayuda de TI. El usuario escribe un problema tecnico, el sistema clasifica el caso, responde con pasos de diagnostico y guarda el historial en una base de datos PostgreSQL. La parte importante del proyecto no es solo el chatbot, sino que la solucion esta desplegada como un sistema administrable: VPS en AWS, Docker Compose, Terraform, CI/CD, persistencia y backup.
+HelpDesk AI es una aplicacion web de IA para apoyar una mesa de ayuda de TI. El usuario escribe un problema tecnico, puede adjuntar una captura del error, el sistema clasifica el caso, responde con pasos de diagnostico y guarda el historial en una base de datos PostgreSQL. La parte importante del proyecto no es solo el chatbot, sino que la solucion esta desplegada como un sistema administrable: VPS en AWS, Docker Compose, Terraform, CI/CD, persistencia y backup.
 
 ## Orden recomendado
 
@@ -48,6 +48,7 @@ Demo:
 - Abrir http://18.212.132.228:8080
 - Crear una nueva consulta.
 - Escribir: "No puedo acceder al correo de la empresa".
+- Opcionalmente adjuntar una captura de pantalla de error.
 - Mostrar que responde y clasifica como correo.
 
 ### Agusto: arquitectura e infraestructura AWS
@@ -77,8 +78,9 @@ Explicar:
 
 - La solucion corre con Docker Compose.
 - Hay tres servicios: frontend, backend y db.
-- PostgreSQL guarda conversaciones y mensajes.
+- PostgreSQL guarda conversaciones, mensajes y la referencia a imagenes adjuntas.
 - El volumen `postgres_data` conserva la informacion.
+- El volumen `uploads_data` conserva las imagenes subidas por los usuarios.
 - El script de backup genera un `.sql.gz`.
 
 Frase sugerida:
@@ -108,7 +110,7 @@ Explicar:
 Frase sugerida:
 
 ```text
-El backend esta hecho en FastAPI. Cuando recibe una consulta, guarda el mensaje, clasifica el incidente y genera una respuesta. Tambien dejamos un modo de respaldo sin API key para que la demo no dependa de un servicio externo. En CI/CD usamos GitHub Actions para validar el backend, revisar Docker Compose y dejar preparado el despliegue por SSH hacia la VPS.
+El backend esta hecho en FastAPI. Cuando recibe una consulta, guarda el mensaje, guarda la imagen adjunta si existe, clasifica el incidente y genera una respuesta. Tambien dejamos un modo de respaldo sin API key para que la demo no dependa de un servicio externo. En CI/CD usamos GitHub Actions para validar el backend, revisar Docker Compose y dejar preparado el despliegue por SSH hacia la VPS.
 ```
 
 Mostrar:
@@ -124,11 +126,12 @@ Mostrar:
 1. El usuario entra a la web.
 2. El frontend carga el historial desde el backend.
 3. El usuario envia una pregunta.
-4. El backend guarda el mensaje en PostgreSQL.
-5. El backend detecta la categoria del incidente.
-6. El backend genera una respuesta.
-7. La respuesta se guarda en PostgreSQL.
-8. El frontend muestra la conversacion actualizada.
+4. Si el usuario adjunta una captura, el backend la guarda en `/app/uploads`.
+5. El backend guarda el mensaje en PostgreSQL.
+6. El backend detecta la categoria del incidente.
+7. El backend genera una respuesta.
+8. La respuesta se guarda en PostgreSQL.
+9. El frontend muestra la conversacion actualizada.
 
 ### Arquitectura
 
@@ -151,6 +154,7 @@ PostgreSQL :5432
 - `backend`: API y logica del chatbot.
 - `db`: base de datos PostgreSQL.
 - `postgres_data`: volumen persistente.
+- `uploads_data`: volumen persistente para imagenes adjuntas.
 
 ### Evidencia actual
 
@@ -163,7 +167,7 @@ PostgreSQL :5432
 
 ### Donde esta la persistencia?
 
-En PostgreSQL. Las conversaciones se guardan en `conversations` y los mensajes en `messages`. Docker Compose usa el volumen `postgres_data`.
+En PostgreSQL. Las conversaciones se guardan en `conversations` y los mensajes en `messages`. Docker Compose usa el volumen `postgres_data`. Las imagenes se guardan en el volumen `uploads_data`.
 
 ### Que pasa si se reinicia el contenedor?
 
@@ -194,4 +198,3 @@ Porque EC2 provee una maquina virtual Linux accesible por SSH, con IP publica, f
 ```text
 Como conclusion, HelpDesk AI demuestra una aplicacion web de IA funcional y administrable desde TI. No solo construimos el chatbot, sino tambien su despliegue real en AWS, contenedorizacion, persistencia, CI/CD, infraestructura como codigo y una estrategia basica de backup.
 ```
-

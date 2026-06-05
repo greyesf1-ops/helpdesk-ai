@@ -33,13 +33,20 @@
         <div id="messages" class="messages"></div>
 
         <form id="messageForm" class="composer">
-          <textarea
-            id="messageInput"
-            rows="3"
-            placeholder="Describe el problema tecnico..."
-            required
-          ></textarea>
-          <button type="submit">Enviar</button>
+          <div class="composer-body">
+            <textarea
+              id="messageInput"
+              rows="3"
+              placeholder="Describe el problema tecnico..."
+              required
+            ></textarea>
+            <div id="attachmentPreview" class="attachment-preview hidden"></div>
+          </div>
+          <div class="composer-actions">
+            <input id="attachmentInput" type="file" accept="image/*" hidden />
+            <button id="attachmentButton" class="secondary-button" type="button">Adjuntar captura</button>
+            <button type="submit">Enviar</button>
+          </div>
         </form>
       </section>
     </main>
@@ -47,4 +54,3 @@
     <script src="app.js"></script>
   </body>
 </html>
-

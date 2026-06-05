@@ -6,6 +6,7 @@ Chatbot web de soporte tecnico con historial de conversaciones. El proyecto esta
 
 - Chatbot para consultas de soporte tecnico.
 - Historial persistente de conversaciones.
+- Adjuntos de imagen para capturas de errores o evidencia.
 - Clasificacion basica de incidentes por categoria.
 - Respuesta con OpenAI cuando existe `OPENAI_API_KEY`.
 - Modo de respaldo local para demo sin API key.
@@ -85,8 +86,9 @@ El estado principal vive en PostgreSQL:
 - Conversaciones en la tabla `conversations`.
 - Mensajes de usuario y asistente en la tabla `messages`.
 - Categoria detectada para cada mensaje.
+- URL de imagen adjunta cuando el usuario carga una captura.
 
-Docker Compose usa el volumen `postgres_data`, por lo que la base de datos no se pierde al recrear contenedores.
+Docker Compose usa el volumen `postgres_data`, por lo que la base de datos no se pierde al recrear contenedores. Las imagenes cargadas se guardan en el volumen `uploads_data`, montado en el backend en `/app/uploads`.
 
 ## Backup y recuperacion
 
