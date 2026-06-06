@@ -41,6 +41,7 @@ jobs:
           username: ${{ env.VPS_USER }}
           key: ${{ env.VPS_SSH_KEY }}
           script: |
+            sudo chown -R "$(whoami):$(whoami)" "${{ env.APP_DIR }}"
             git config --global --add safe.directory "${{ env.APP_DIR }}"
             cd "${{ env.APP_DIR }}"
             git pull origin main
