@@ -80,7 +80,7 @@ function renderConversations() {
   if (!filtered.length) {
     const empty = document.createElement("div");
     empty.className = "conversation-empty";
-    empty.textContent = state.searchTerm ? "Sin resultados" : "Crea una consulta";
+    empty.textContent = state.searchTerm ? "Sin resultados" : "Sin conversaciones";
     elements.conversationList.appendChild(empty);
     return;
   }
@@ -284,7 +284,8 @@ async function boot() {
     if (state.currentConversationId) {
       await selectConversation(state.currentConversationId);
     } else {
-      await createConversation();
+      elements.conversationTitle.textContent = "Consulta de soporte";
+      renderMessages([]);
     }
   } catch (error) {
     setStatus("Sin conexion", false);
