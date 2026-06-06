@@ -9,14 +9,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      VPS_HOST: 18.212.132.228
-      VPS_USER: ubuntu
-      APP_DIR: /opt/helpdesk-ai
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      APP_DIR: ${{ secrets.APP_DIR }}
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
     steps:
-      - name: Validate SSH key secret
+      - name: Validate deployment secrets
         run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "::error title=Missing secret::Add VPS_HOST in repository secrets"
+            exit 1
+          fi
+          if [ -z "$VPS_USER" ]; then
+            echo "::error title=Missing secret::Add VPS_USER in repository secrets"
+            exit 1
+          fi
+          if [ -z "$APP_DIR" ]; then
+            echo "::error title=Missing secret::Add APP_DIR in repository secrets"
+            exit 1
+          fi
           if [ -z "$VPS_SSH_KEY" ]; then
             echo "::error title=Missing secret::Add VPS_SSH_KEY in repository secrets"
             exit 1
